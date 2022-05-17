@@ -219,6 +219,8 @@ class ConstarintGizmoGeneric(ConstraintGizmo):
 
         self._create_shape(context, constr)
         self.draw_custom_shape(self.custom_shape)
+        if hasattr(self, "custom_shape2"):
+            self.draw_custom_shape(self.custom_shape2)
 
     def draw_select(self, context, select_id):
         constr = self._get_constraint(context)
@@ -335,9 +337,11 @@ class VIEW3D_GT_slvs_distance(Gizmo, ConstarintGizmoGeneric):
         ui_scale = context.preferences.system.ui_scale
         dist = constr.value / 2 / ui_scale
         offset = self.target_get_value("offset")
-
+        outset = constr.draw_outset
         p1 = Vector((-dist, offset, 0.0))
         p2 = Vector((dist, offset, 0.0))
+        if (not constr.draw_inside) and (outset > 0):
+            p1, p2 = p2, p1
 
         rv3d = context.region_data
         p1_global, p2_global = [self.matrix_world @ p for p in (p1, p2)]
@@ -346,18 +350,41 @@ class VIEW3D_GT_slvs_distance(Gizmo, ConstarintGizmoGeneric):
         arrow_1 = get_arrow_size(dist, scale_1)
         arrow_2 = get_arrow_size(dist, scale_2)
 
-        coords = (
-            *draw_arrow_shape(
-                p1, p1 + Vector((arrow_1[0], 0, 0)), arrow_1[1], is_3d=True
-            ),
-            p1,
-            p2,
-            *draw_arrow_shape(
-                p2, p2 - Vector((arrow_2[0], 0, 0)), arrow_2[1], is_3d=True
-            ),
-            *(self._get_helplines(context, constr, scale_1, scale_2) if not select else ()),
-        )
+        if constr.draw_inside:
+            coords = (
+                *draw_arrow_shape(
+                    p1, p1 + Vector((arrow_1[0], 0, 0)), arrow_1[1], is_3d=True
+                ),
+                p1,
+                p2,
+                *draw_arrow_shape(
+                    p2, p2 - Vector((arrow_2[0], 0, 0)), arrow_2[1], is_3d=True
+                ),
+                *(self._get_helplines(context, constr, scale_1, scale_2) if not select else ()),
+            )
+        else:
+            pos = Vector((outset, offset, 0))
+            pos_global = self.matrix_world @ pos.to_3d()
+            coords = (
+                *draw_arrow_shape(
+                    p1, p1 + Vector((math.copysign(arrow_1[0],outset), 0, 0)), arrow_1[1], is_3d=True
+                ),
+                p1,
+                pos,
+                *(self._get_helplines(context, constr, scale_1, scale_2) if not select else ()),
+            )
 
+            pos = Vector((-outset, offset, 0))
+            pos_global = self.matrix_world @ pos.to_3d()
+            coords2 = (
+                *draw_arrow_shape(
+                    p2, p2 - Vector((math.copysign(arrow_1[0],outset), 0, 0)), arrow_1[1], is_3d=True
+                ),
+                p2,
+                pos,
+                *(self._get_helplines(context, constr, scale_1, scale_2) if not select else ()),
+            )
+            self.custom_shape2 = self.new_custom_shape("LINES", coords2)
         self.custom_shape = self.new_custom_shape("LINES", coords)
 
 

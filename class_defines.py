@@ -1929,7 +1929,9 @@ class SlvsDistance(GenericConstraint, PropertyGroup):
         set=set_distance_value,
     )
     flip: BoolProperty(name="Flip", update=update_system_cb)
+    draw_inside: BoolProperty(name="Draw Inside", default=True)
     draw_offset: FloatProperty(name="Draw Offset", default=0.3)
+    draw_outset: FloatProperty(name="Draw Outset")
     align: EnumProperty(name="Align", items=align_items, update=update_system_cb,)
     type = "DISTANCE"
     signature = (point, (*point, *line, SlvsWorkplane))
@@ -2079,7 +2081,9 @@ class SlvsDistance(GenericConstraint, PropertyGroup):
         return value, None
 
     def update_draw_offset(self, pos, ui_scale):
+        self.draw_inside = True if abs(pos[0]) < self.value/2 else False
         self.draw_offset = pos[1] / ui_scale
+        self.draw_outset = pos[0] / ui_scale
 
     def draw_props(self, layout):
         layout.prop(self, "value")
@@ -2104,8 +2108,12 @@ class SlvsDistance(GenericConstraint, PropertyGroup):
         region = context.region
         rv3d = context.space_data.region_3d
         ui_scale = context.preferences.system.ui_scale
-        coords = self.matrix_basis() @ Vector((0, self.draw_offset * ui_scale, 0))
-        return location_3d_to_region_2d(region, rv3d, coords)
+
+        offset = ui_scale * self.draw_offset
+        outset = ui_scale * self.draw_outset
+        coords = (outset, offset, 0.0)
+        coords2 = self.matrix_basis() @ Vector((coords[0], coords[1], 0.0))
+        return location_3d_to_region_2d(region, rv3d, coords2)
 
 slvs_entity_pointer(SlvsDistance, "entity1")
 slvs_entity_pointer(SlvsDistance, "entity2")
@@ -2158,6 +2166,7 @@ class SlvsDiameter(GenericConstraint, PropertyGroup):
         """location to display the constraint value"""
         region = context.region
         rv3d = context.space_data.region_3d
+
         coords = functions.pol2cart(self.draw_offset,self.leader_angle)
         coords2 = self.matrix_basis() @ Vector((coords[0], coords[1], 0.0))
         return location_3d_to_region_2d(region, rv3d, coords2)
