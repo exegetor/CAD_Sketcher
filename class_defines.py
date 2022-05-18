@@ -1929,7 +1929,7 @@ class SlvsDistance(GenericConstraint, PropertyGroup):
         set=set_distance_value,
     )
     flip: BoolProperty(name="Flip", update=update_system_cb)
-    draw_mode_hist: IntProperty(name="Histeresis", default=0)
+    draw_mode: IntProperty(name="Draw Mode", default=0)
     draw_inside_arrows: BoolProperty(name="Draw Arrows Inside", default=True)
     draw_inside_dim: BoolProperty(name="Draw Dimension Inside", default=True)
     draw_offset: FloatProperty(name="Draw Offset", default=0.3)
@@ -2092,24 +2092,24 @@ class SlvsDistance(GenericConstraint, PropertyGroup):
         measure = self.value/2
         dist = abs(pos[0]) 
         if dist < measure:
-            self.draw_mode_hist = 0
+            self.draw_mode = 0
             self.draw_inside_arrows = True
             self.draw_inside_dim = True
         elif dist < 3*measure:
-            if self.draw_mode_hist == 0: #trigger only upward
-                self.draw_mode_hist = 1
+            if self.draw_mode == 0: #trigger only upward
+                self.draw_mode = 1
                 self.draw_inside_arrows = False
                 self.draw_inside_dim = True
         elif dist < 5*measure:
-            if self.draw_mode_hist < 3:
-                self.draw_mode_hist == 2
+            if self.draw_mode < 3:
+                self.draw_mode == 2
                 self.draw_inside_arrows = True
                 if self.draw_inside_dim == False:
                     self.draw_inside_dim = False  # remove me
                 else:
                     self.draw_inside_dim = False  # remove me too
         else:  #no need to check for upward gesture
-            self.draw_mode_hist = 3
+            self.draw_mode = 3
             self.draw_inside_arrows = False
             self.draw_inside_dim = False
 
