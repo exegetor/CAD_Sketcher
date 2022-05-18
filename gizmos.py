@@ -340,7 +340,7 @@ class VIEW3D_GT_slvs_distance(Gizmo, ConstarintGizmoGeneric):
         outset = constr.draw_outset
         p1 = Vector((-dist, offset, 0.0))
         p2 = Vector((dist, offset, 0.0))
-        if (not constr.draw_inside) and (outset > 0):
+        if (not constr.draw_inside_arrows) and (outset > 0):
             p1, p2 = p2, p1
 
         rv3d = context.region_data
@@ -350,7 +350,7 @@ class VIEW3D_GT_slvs_distance(Gizmo, ConstarintGizmoGeneric):
         arrow_1 = get_arrow_size(dist, scale_1)
         arrow_2 = get_arrow_size(dist, scale_2)
 
-        if constr.draw_inside:
+        if constr.draw_inside_arrows:
             coords = (
                 *draw_arrow_shape(
                     p1, p1 + Vector((arrow_1[0], 0, 0)), arrow_1[1], is_3d=True

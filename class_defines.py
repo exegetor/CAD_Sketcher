@@ -1929,7 +1929,9 @@ class SlvsDistance(GenericConstraint, PropertyGroup):
         set=set_distance_value,
     )
     flip: BoolProperty(name="Flip", update=update_system_cb)
-    draw_inside: BoolProperty(name="Draw Inside", default=True)
+    draw_mode_hist: IntProperty(name="Histeresis", default=0)
+    draw_inside_arrows: BoolProperty(name="Draw Arrows Inside", default=True)
+    draw_inside_dim: BoolProperty(name="Draw Dimension Inside", default=True)
     draw_offset: FloatProperty(name="Draw Offset", default=0.3)
     draw_outset: FloatProperty(name="Draw Outset")
     align: EnumProperty(name="Align", items=align_items, update=update_system_cb,)
@@ -2081,7 +2083,36 @@ class SlvsDistance(GenericConstraint, PropertyGroup):
         return value, None
 
     def update_draw_offset(self, pos, ui_scale):
-        self.draw_inside = True if abs(pos[0]) < self.value/2 else False
+        # [implemented as a state machine with hysteresis]
+        # the user selects the drawing mode
+        # with a mouse gesture.  The modes cycle
+        # on OUTWARD gestures only, so an inward
+        # gesture can follow to position the
+        # text.
+        measure = self.value/2
+        dist = abs(pos[0]) 
+        if dist < measure:
+            self.draw_mode_hist = 0
+            self.draw_inside_arrows = True
+            self.draw_inside_dim = True
+        elif dist < 3*measure:
+            if self.draw_mode_hist == 0: #trigger only upward
+                self.draw_mode_hist = 1
+                self.draw_inside_arrows = False
+                self.draw_inside_dim = True
+        elif dist < 5*measure:
+            if self.draw_mode_hist < 3:
+                self.draw_mode_hist == 2
+                self.draw_inside_arrows = True
+                if self.draw_inside_dim == False:
+                    self.draw_inside_dim = False  # remove me
+                else:
+                    self.draw_inside_dim = False  # remove me too
+        else:  #no need to check for upward gesture
+            self.draw_mode_hist = 3
+            self.draw_inside_arrows = False
+            self.draw_inside_dim = False
+
         self.draw_offset = pos[1] / ui_scale
         self.draw_outset = pos[0] / ui_scale
 
@@ -2111,7 +2142,10 @@ class SlvsDistance(GenericConstraint, PropertyGroup):
 
         offset = ui_scale * self.draw_offset
         outset = ui_scale * self.draw_outset
-        coords = (outset, offset, 0.0)
+        if ((self.draw_inside_dim == True) and (self.draw_inside_arrows == False)):
+            coords = (0, offset, 0.0)
+        else:
+            coords = (outset, offset, 0.0)
         coords2 = self.matrix_basis() @ Vector((coords[0], coords[1], 0.0))
         return location_3d_to_region_2d(region, rv3d, coords2)
 
