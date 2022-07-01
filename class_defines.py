@@ -2289,6 +2289,8 @@ class SlvsDistance(GenericConstraint, PropertyGroup):
 
     def use_flipping(self):
         # Only use flipping for constraint between point and line/workplane
+        if self.entity1.is_curve:
+            return False
         return type(self.entity2) in (*line, SlvsWorkplane)
 
     def use_align(self):
@@ -2305,6 +2307,7 @@ class SlvsDistance(GenericConstraint, PropertyGroup):
     def create_slvs_data(self, solvesys, group=Solver.group_fixed):
         if self.entity1 == self.entity2:
             raise AttributeError("Cannot create constraint between one entity itself")
+        #TODO: don't allow Distance if Point -> Line if (Point in Line)
 
         e1, e2 = self.entity1, self.entity2
         if e1.is_line():
@@ -2312,13 +2315,23 @@ class SlvsDistance(GenericConstraint, PropertyGroup):
 
         func = None
         set_wp = False
+        wp = self.get_workplane()
         alignment = self.align
         align = self.use_align() and alignment != "NONE"
         handles = []
 
         value = self.get_value()
 
-        if type(e2) in line:
+        # circle/arc -> line/point
+        if type(e1) in curve:
+            # TODO: make Horizontal and Vertical alignment work
+            if type(e2) in line:
+                return solvesys.addPointLineDistance(value + e1.radius, e1.ct.py_data, e2.py_data, wp, group)
+            else:
+                assert(isinstance(e2, SlvsPoint2D))
+                return solvesys.addPointsDistance(value + e1.radius, e1.ct.py_data, e2.py_data, wp, group)
+
+        elif type(e2) in line:
             func = solvesys.addPointLineDistance
             set_wp = True
         elif isinstance(e2, SlvsWorkplane):
@@ -2330,7 +2343,6 @@ class SlvsDistance(GenericConstraint, PropertyGroup):
                 coords = (p2.x, p1.y)
 
                 params = [solvesys.addParamV(v, group) for v in coords]
-                wp = self.get_workplane()
                 p = solvesys.addPoint2d(wp, *params, group=group)
 
                 handles.append(solvesys.addPointsHorizontal(p, e2.py_data, wp, group=group))
@@ -2357,35 +2369,72 @@ class SlvsDistance(GenericConstraint, PropertyGroup):
             # TODO: Support distance in 3d
             return Matrix()
 
-        e1, e2 = self.entity1, self.entity2
-        if e1.is_line():
-            e1, e2 = e1.p1, e1.p2
-
         sketch = self.sketch
         x_axis = Vector((1, 0))
         alignment = self.align
         align = alignment != "NONE"
 
-        if type(e2) in point_2d:
-            p1, p2 = e1.co, e2.co
-            if align:
-                v_rotation = Vector((1.0, 0.0)) if alignment == "HORIZONTAL" else Vector((0.0, 1.0))
-            else:
-                v_rotation = p2 - p1
-            v_translation = (p2 + p1) / 2
+        e1, e2 = self.entity1, self.entity2
+        #   e1       e2
+        #   ----------------
+        #   line     [none]
+        #   point    point
+        #   point    line
+        #   arc      point
+        #   arc      line
+        #   circle   point
+        #   circle   line
 
+        # set p1 and p2
+        if e1.is_curve():
+            # reframe as point->point and continue
+            centerpoint = e1.ct.co
+            if e2.is_line():
+                p2, whatever = intersect_point_line(centerpoint, e2.p1.co, e2.p2.co)
+            else:
+                assert(isinstance(e2, SlvsPoint2D))
+                p2 = e2.co
+            vec = (p2 - centerpoint) / (p2 - centerpoint).length
+            p1 = centerpoint + (e1.radius * Vector(vec))
+        elif e1.is_line():
+            # reframe as point->point and continue
+            e1, e2 = e1.p1, e1.p2
+            p1, p2 = e1.co, e2.co
+        else:
+            assert(isinstance(e1,SlvsPoint2D))
+            p1 = e1.co
+
+
+        # NOTE: p2 is still not defined if e1 is point
+        if type(e2) in point_2d:
+        # this includes "Line Length" (became Point->Point)
+        # and Curve -> Point
+            if not align:
+                v_rotation = p2 - p1
+            else:
+                v_rotation = Vector((1.0, 0.0)) if alignment == "HORIZONTAL" else Vector((0.0, 1.0))
             angle = v_rotation.angle_signed(x_axis)
             mat_rot = Matrix.Rotation(angle, 2, "Z")
+            v_translation = (p2 + p1) / 2
 
-        elif isinstance(e2, SlvsLine2D):
-            line = e2
-            orig = line.p1.co
-            end = line.p2.co - orig
-            angle = functions.range_2pi(math.atan2(end[1], end[0])) + math.pi / 2
-
-            mat_rot = Matrix.Rotation(angle, 2, "Z")
-            p1 = e1.co - orig
-            v_translation = (p1 + p1.project(end)) / 2 + orig
+        elif e2.is_line():
+            if e1.is_curve():
+                if not align:
+                    v_rotation = p2 - p1
+                else:
+                    v_rotation = Vector((1.0, 0.0)) if alignment == "HORIZONTAL" else Vector((0.0, 1.0))
+                angle = v_rotation.angle_signed(x_axis)
+                mat_rot = Matrix.Rotation(angle, 2, "Z")
+                v_translation = (p2 + p1) / 2
+            else:
+                assert(isinstance(e1, SlvsPoint2D))
+                orig = e2.p1.co
+                end = e2.p2.co
+                vec = end - orig
+                angle = (math.tau/4) + functions.range_2pi(math.atan2(vec[1], vec[0]))
+                mat_rot = Matrix.Rotation(angle, 2, "Z")
+                p1 = p1 - orig
+                v_translation = orig + (p1 + p1.project(vec)) / 2
 
         mat_local = Matrix.Translation(v_translation.to_3d()) @ mat_rot.to_4x4()
         return sketch.wp.matrix_basis @ mat_local
