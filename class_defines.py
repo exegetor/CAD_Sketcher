@@ -2266,7 +2266,7 @@ class SlvsDistance(GenericConstraint, PropertyGroup):
     draw_offset: FloatProperty(name="Draw Offset", default=0.3)
     draw_outset: FloatProperty(name="Draw Outset", default=0.0)
     type = "DISTANCE"
-    signature = ((*point, *line), (*point, *line, SlvsWorkplane))
+    signature = ((*point, *line, SlvsCircle, SlvsArc), (*point, *line, SlvsWorkplane))
 
     @classmethod
     def get_types(cls, index, entities):
