@@ -22,6 +22,7 @@ from bpy_extras.view3d_utils import location_3d_to_region_2d
 import math, mathutils
 from mathutils import Vector, Matrix
 from typing import Union, Tuple, Type, Callable, Mapping
+from mathutils.geometry import intersect_point_line
 
 from .shaders import Shaders
 from .solver import solve_system, Solver
@@ -2395,6 +2396,14 @@ class SlvsDistance(GenericConstraint, PropertyGroup):
         e1, e2 = self.entity1, self.entity2
         if e1.is_line():
             value = e1.length
+        elif type(e1) in curve:
+            centerpoint = e1.ct.co
+            if isinstance(e2, SlvsLine2D):
+                endpoint, whatever = intersect_point_line(centerpoint, e2.p1.co, e2.p2.co)
+            else:
+                assert isinstance(e2, SlvsPoint2D)
+                endpoint = e2.co
+            value = (centerpoint - endpoint).length - e1.radius
         elif isinstance(e2, SlvsWorkplane):
             # Returns the signed distance to the plane
             value = distance_point_to_plane(e1.location, e2.p1.location, e2.normal)
