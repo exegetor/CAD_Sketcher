@@ -314,7 +314,7 @@ class VIEW3D_GT_slvs_distance(Gizmo, ConstraintGizmoGeneric):
         # Store the two endpoints of the helplines in local space
         points_local = []
 
-        if isinstance(entity1, class_defines.SlvsCircle):
+        if entity1.is_curve():
             centerpoint = entity1.ct.co
 
             if isinstance(entity2, class_defines.SlvsPoint2D):
